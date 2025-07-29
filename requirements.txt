@@ -1,0 +1,13 @@
+fastapi>=0.109.1
+uvicorn>=0.27.0
+python-dotenv>=1.0.0
+langchain>=0.1.13
+langchain-openai>=0.1.13
+langchain-community>=0.0.25
+pypdf>=3.17.4
+chromadb>=0.4.24
+openai>=1.12.0
+pydantic>=2.6.3
+pydantic-settings>=2.1.0
+tiktoken>=0.6.0
+requests>=2.31.0  # For DeepSeek API
