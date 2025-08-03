@@ -4,12 +4,12 @@ class PDFUpload(BaseModel):
     filename: str
 
 class SummaryRequest(BaseModel):
-    document_id: str
+    document_name: str
 
 class SummaryResponse(BaseModel):
     summary: str
-    document_id: str
+    document_name: str
 
 class AskRequest(BaseModel):
-    document_id: str
+    document_name: str
     query: str

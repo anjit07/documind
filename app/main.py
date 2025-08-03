@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import List
 import uuid
 
-from app.services.pdf_processor import PDFProcessor
-from app.db.vector_db import VectorDB
+from app.utils.pdf_processor import PDFProcessor
+from app.utils.chuck_file import ChunkFile
+from app.vector_storage.vector_db import VectorDB
+from app.models.schemas import PDFUpload,SummaryRequest, SummaryResponse, AskRequest
+from app.configuration.config import settings
 from app.services.summarizer import Summarizer
-from app.models.schemas import PDFUpload, SummaryRequest, SummaryResponse, AskRequest
-from app.utils.config import settings
-
 app = FastAPI()
 
 # CORS middleware
@@ -25,6 +25,7 @@ app.add_middleware(
 # Initialize services
 pdf_processor = PDFProcessor()
 vector_db = VectorDB()
+chunkFile = ChunkFile()
 summarizer = Summarizer()
 
 DATA_DIR = "data"
@@ -48,41 +49,113 @@ async def process_pdf(filename: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Process PDF
-    chunks = pdf_processor.extract_text(file_path)
-    
-    # Generate unique IDs for each chunk
+    # process PDF file and extract text and return documents
+    documents = pdf_processor.extract_text(file_path)
+    if not documents:
+        raise HTTPException(status_code=500, detail="Failed to extract text from PDF")
+
+    # Chunk the documents
+    chunks = chunkFile.recursive_chunking(documents)
+
+    # Generate unique IDs for each document
     doc_ids = [str(uuid.uuid4()) for _ in range(len(chunks))]
-    
+
     # Store in vector DB
     collection_name = filename.split(".")[0]
-    vector_db.create_collection(collection_name, chunks, doc_ids)
-    
+    savedData =  vector_db.create_collection(collection_name, chunks, doc_ids)
+
+    print("savedData :", savedData._collection.count())
+    print("Collection name:", savedData._collection.name)
+
+    # To fetch and print all document IDs:
+    #print("Document IDs:", savedData._collection.get()["ids"])
+
     return doc_ids
 
 @app.post("/summarize", response_model=SummaryResponse)
 async def summarize_document(request: SummaryRequest):
-    # In a real application, you would retrieve the document from the vector DB
-    # For simplicity, we'll just summarize the first chunk
-    collection = vector_db.get_collection(request.document_id.split("_")[0])
-    documents = collection.get(ids=[request.document_id])
-    if not documents or not documents["documents"]:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    document_text = documents["documents"][0]
-    summary = summarizer.summarize(document_text)
-    
-    return {"summary": summary, "document_id": request.document_id}
+   
 
-@app.post("/ask")
+    collection = vector_db.get_collection(request.document_name)
+    print("summarize collection :", collection._collection.count())
+    document_text = [doc for doc in collection.get()["documents"]]
+    #print("document_text :", document_text)
+    summary = summarizer.summarize(document_text)
+    print("summary :", summary)
+
+    return {"summary": summary, "document_name": request.document_name}
+
+@app.post("/ask", response_model=SummaryResponse)
 async def ask_question(request: AskRequest):
-    # Retrieve relevant chunks using vector search
-    collection = vector_db.get_collection(request.document_id)
-    relevant_chunks = collection.search(query=request.query, top_k=3)
-    context = " ".join(relevant_chunks)
-    # Pass context and query to LLM
-    answer = summarizer.summarize(f"Context: {context}\n\nQuestion: {request.query}")
-    return {"answer": answer}
+
+    collection = vector_db.get_collection(request.document_name)
+    print("ask collection :", collection._collection.count())
+
+    document_text = [doc for doc in collection.get()["documents"]]
+
+    answer = summarizer.ask(document_text, request.query)
+    
+    print("answer :", answer)
+
+    return {"summary": answer, "document_name": request.document_name}
+
+
+@app.post("/chartwith", response_model=SummaryResponse)
+async def chartwith_question(request: AskRequest):
+
+    collection = vector_db.get_collection(request.document_name)
+    print("chartwith collection :", collection._collection.count())
+    search_data=  collection.similarity_search(request.query)
+
+    # Extract text content from the Document objects
+    retrieved_texts = [doc.page_content for doc in search_data]
+    # Format them into a single context string
+    context = "\n\n".join(retrieved_texts)
+    #print("context :", context)
+
+    answer = summarizer.chart_with(context, request.query)
+
+    print("chartwith_question Answer :", answer)
+
+    return {"summary": answer, "document_name": request.document_name}
+
+
+@app.post("/chartwith", response_model=SummaryResponse)
+async def chartwith_question(request: AskRequest):
+
+    collection = vector_db.get_collection(request.document_name)
+    print("chartwith collection :", collection._collection.count())
+    search_data=  collection.similarity_search(request.query)
+
+    # Extract text content from the Document objects
+    retrieved_texts = [doc.page_content for doc in search_data]
+    # Format them into a single context string
+    context = "\n\n".join(retrieved_texts)
+    #print("context :", context)
+
+    answer = summarizer.chart_with(context, request.query)
+
+    print("chartwith_question Answer :", answer)
+
+    return {"summary": answer, "document_name": request.document_name}
+
+@app.post("/query", response_model=SummaryResponse)
+async def query_document(request: AskRequest):
+
+    collection = vector_db.get_collection(request.document_name)
+    print("query_document  count :", collection._collection.count())
+    search_data=  collection.similarity_search(request.query)
+
+    # Step 1: Extract text content from the Document objects
+    retrieved_texts = [doc.page_content for doc in search_data]
+    # Step 2: Format them into a single context string
+    context = "\n\n".join(retrieved_texts)
+
+    answer = summarizer.ask(context, request.query)
+
+    print("query_document Answer :", answer)
+
+    return {"summary": answer, "document_name": request.document_name}
 
 #if __name__ == "__main__":
  #   import uvicorn

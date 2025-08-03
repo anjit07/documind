@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+chroma_db/# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -50,6 +50,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+chroma_db/
 
 # Translations
 *.mo
