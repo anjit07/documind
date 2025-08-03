@@ -88,11 +88,16 @@ async def summarize_document(request: SummaryRequest):
 @app.post("/ask", response_model=SummaryResponse)
 async def ask_question(request: AskRequest):
 
+    # RAG 
+
+    # Retrieval : Retrieve relevant chunks using vector search
     collection = vector_db.get_collection(request.document_name)
     print("ask collection :", collection._collection.count())
 
+    # Augmentation : Extract text content from the Document objects
     document_text = [doc for doc in collection.get()["documents"]]
 
+    # Generation :LLM uses the context + query to generate an answer
     answer = summarizer.ask(document_text, request.query)
     
     print("answer :", answer)
@@ -103,39 +108,24 @@ async def ask_question(request: AskRequest):
 @app.post("/chartwith", response_model=SummaryResponse)
 async def chartwith_question(request: AskRequest):
 
+    # Retrieval : Retrieve relevant chunks using vector search
     collection = vector_db.get_collection(request.document_name)
     print("chartwith collection :", collection._collection.count())
     search_data=  collection.similarity_search(request.query)
 
-    # Extract text content from the Document objects
+    # Augmentation : Extract text content from the Document objects
     retrieved_texts = [doc.page_content for doc in search_data]
     # Format them into a single context string
     context = "\n\n".join(retrieved_texts)
-    #print("context :", context)
+    
 
+    # Generation :LLM uses the context + query to generate an answer.
     answer = summarizer.chart_with(context, request.query)
 
     print("chartwith_question Answer :", answer)
 
     return {"summary": answer, "document_name": request.document_name}
 
-
-@app.post("/chartwith", response_model=SummaryResponse)
-async def chartwith_question(request: AskRequest):
-
-    collection = vector_db.get_collection(request.document_name)
-    print("chartwith collection :", collection._collection.count())
-    search_data=  collection.similarity_search(request.query)
-
-    # Extract text content from the Document objects
-    retrieved_texts = [doc.page_content for doc in search_data]
-    # Format them into a single context string
-    context = "\n\n".join(retrieved_texts)
-    #print("context :", context)
-
-    answer = summarizer.chart_with(context, request.query)
-
-    print("chartwith_question Answer :", answer)
 
     return {"summary": answer, "document_name": request.document_name}
 
@@ -144,13 +134,14 @@ async def query_document(request: AskRequest):
 
     collection = vector_db.get_collection(request.document_name)
     print("query_document  count :", collection._collection.count())
-    search_data=  collection.similarity_search(request.query)
+    search_data=  collection.similarity_search(request.query,k=2)
 
     # Step 1: Extract text content from the Document objects
     retrieved_texts = [doc.page_content for doc in search_data]
     # Step 2: Format them into a single context string
     context = "\n\n".join(retrieved_texts)
 
+    print("context## :", context)
     answer = summarizer.ask(context, request.query)
 
     print("query_document Answer :", answer)
