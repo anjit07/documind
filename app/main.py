@@ -134,7 +134,7 @@ async def query_document(request: AskRequest):
 
     collection = vector_db.get_collection(request.document_name)
     print("query_document  count :", collection._collection.count())
-    search_data=  collection.similarity_search(request.query,k=2)
+    search_data=  vector_db.search(request.document_name, request.query)
 
     # Step 1: Extract text content from the Document objects
     retrieved_texts = [doc.page_content for doc in search_data]
@@ -142,11 +142,13 @@ async def query_document(request: AskRequest):
     context = "\n\n".join(retrieved_texts)
 
     print("context## :", context)
-    answer = summarizer.ask(context, request.query)
+    answer =summarizer.ask(context, request.query)
 
     print("query_document Answer :", answer)
 
     return {"summary": answer, "document_name": request.document_name}
+
+
 
 #if __name__ == "__main__":
  #   import uvicorn

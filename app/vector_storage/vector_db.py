@@ -55,12 +55,18 @@ class VectorDB:
             client=self.client
         )
     
-
-    def search(self, collection_name: str, query: str, top_k: int = 3) -> list:
-        """
-        Dummy implementation: returns top_k chunks from the collection.
-        Replace with actual vector similarity search logic.
-        """
+    def search(self, collection_name: str, query: str, top_k: int = 4):
         collection = self.get_collection(collection_name)
-        # Assume collection["documents"] is a list of chunk texts
-        return collection["documents"][:top_k]
+        results = collection.similarity_search(query, k=top_k)
+        unique_results = []
+        seen_contents = set()
+
+        for doc in results:
+            if doc.page_content not in seen_contents:
+                unique_results.append(doc)
+                seen_contents.add(doc.page_content)
+            if len(unique_results) >= top_k:
+                break
+
+        return unique_results
+        
